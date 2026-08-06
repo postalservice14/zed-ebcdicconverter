@@ -155,7 +155,7 @@ This means EBCDIC files look like mojibake until converted. That is expected.
 
 ```sh
 cd server
-cargo test           # 75 unit + 14 CLI + 7 protocol tests
+cargo test           # 77 unit + 14 CLI + 7 protocol tests
 cargo clippy --all-targets -- -D warnings
 cargo fmt
 
