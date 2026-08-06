@@ -1,0 +1,30 @@
+# Deliberately NOT a member of the repository's root Cargo workspace.
+#
+# The root crate is the Zed extension, which Zed builds for wasm32-wasip2. If this crate
+# were a workspace member, that build would try to resolve this crate's dependency tree
+# for the wasm target and fail. The empty [workspace] table detaches it.
+[workspace]
+
+[package]
+name = "ebcdic-lsp"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+description = "Language server that converts between ASCII and EBCDIC codepages via code actions"
+repository = "https://github.com/postalservice14/zed-ebcdicconverter"
+license = "MIT"
+
+[dependencies]
+# rust-analyzer's synchronous stdio LSP transport: no async runtime, so the binary stays
+# small and starts fast, which matters for a server Zed launches per project.
+lsp-server = "0.10"
+lsp-types = "0.97"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

@@ -1,0 +1,48 @@
+// Tasks for converting EBCDIC files with `ebcdic-lsp convert`. Run them with
+// `task: spawn` (cmd-shift-p). Copy this file into any project that holds mainframe
+// extracts, or merge it into ~/.config/zed/tasks.json to have them everywhere.
+//
+// IMPORTANT: $ZED_FILE comes from the *active editor*. Zed refuses to open files containing
+// NUL bytes, which most variable-length EBCDIC extracts do, so those files can never be the
+// active editor and the "current file" tasks below will not see them. For those, use the
+// "selected text as path" task, or just run the command in Zed's terminal:
+//
+//     ebcdic-lsp convert --rdw -c 0037 <file> -o <file>.txt
+[
+  {
+    // For RDW/SDW-framed extracts (RECFM=VB or VBS). Writes <name>.txt beside the input.
+    "label": "EBCDIC: decode current file (RDW-framed)",
+    "command": "ebcdic-lsp",
+    "args": ["convert", "--rdw", "-c", "0037", "$ZED_FILE", "-o", "$ZED_FILE.txt"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
+  },
+  {
+    // For flat EBCDIC files with no record framing.
+    "label": "EBCDIC: decode current file (flat)",
+    "command": "ebcdic-lsp",
+    "args": ["convert", "-c", "0037", "$ZED_FILE", "-o", "$ZED_FILE.txt"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always"
+  },
+  {
+    // The route that works for files Zed will not open: select the path anywhere -- the
+    // terminal, a notes file, the output of `ls` -- and run this.
+    "label": "EBCDIC: decode file named by selection (RDW-framed)",
+    "command": "ebcdic-lsp",
+    "args": ["convert", "--rdw", "-c", "0037", "$ZED_SELECTED_TEXT", "-o", "$ZED_SELECTED_TEXT.txt"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always"
+  },
+  {
+    // Prints record counts, spanned-segment counts and the payload total without writing a
+    // file. Useful for confirming a file really is RDW-framed before converting it.
+    "label": "EBCDIC: inspect framing of current file",
+    "command": "sh",
+    "args": ["-c", "ebcdic-lsp convert --rdw \"$ZED_FILE\" -o /dev/null"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always"
+  }
+]

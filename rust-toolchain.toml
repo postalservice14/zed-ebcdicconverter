@@ -1,0 +1,6 @@
+[toolchain]
+channel = "1.97.1"
+# wasm32-wasip2 is the target Zed compiles extensions to; without it `cargo build --release
+# --target wasm32-wasip2` fails with a missing-std error rather than anything self-explanatory.
+targets = ["wasm32-wasip2"]
+components = ["clippy", "rustfmt"]

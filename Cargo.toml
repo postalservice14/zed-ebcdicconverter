@@ -1,0 +1,22 @@
+[package]
+name = "zed_ebcdic_converter"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Zed extension that launches ebcdic-lsp"
+repository = "https://github.com/postalservice14/zed-ebcdicconverter"
+license = "MIT"
+
+[lib]
+# Zed loads extensions as WebAssembly components, which requires a cdylib.
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+zed_extension_api = "0.7"
+
+# The `server/` crate is intentionally excluded: it is a native binary with its own
+# dependency tree, and Zed builds this package for wasm32-wasip2. Listing it here would drag
+# those dependencies into the wasm build. `server/Cargo.toml` declares its own [workspace].
+[workspace]
+members = []

@@ -1,0 +1,16 @@
+id = "ebcdic-converter"
+name = "EBCDIC Converter"
+description = "Convert between ASCII and 11 EBCDIC codepages from the code actions menu"
+version = "0.1.0"
+schema_version = 1
+authors = ["John Kelly <wablam@gmail.com>"]
+repository = "https://github.com/postalservice14/zed-ebcdicconverter"
+
+[language_servers.ebcdic-lsp]
+name = "EBCDIC Converter"
+# Attached to plain-text-ish languages because EBCDIC data files are not a "language".
+# "Unknown" matters most: mainframe extracts often carry extensions Zed cannot classify,
+# and without it those buffers would get no code actions at all.
+languages = ["Plain Text", "Unknown"]
+# Declared so Zed knows this server only ever contributes rewrite actions.
+code_action_kinds = ["refactor.rewrite"]

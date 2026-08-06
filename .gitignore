@@ -1,0 +1,18 @@
+target/
+server/target/
+*.wasm
+
+# Zed writes these into a dev extension's directory when it builds/downloads a server.
+grammars/
+ebcdic-lsp-*/
+
+__pycache__/
+*.pyc
+
+# Editor/IDE state
+.idea/
+.DS_Store
+
+# .zed/tasks.json is intentionally tracked as a usable example; ignore the rest of .zed/.
+.zed/*
+!.zed/tasks.json

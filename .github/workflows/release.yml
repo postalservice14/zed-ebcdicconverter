@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: ${{ matrix.asset }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Asset names must match what src/lib.rs constructs from zed::current_platform().
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+            asset: ebcdic-lsp-darwin-arm64.tar.gz
+          - target: x86_64-apple-darwin
+            runner: macos-latest
+            asset: ebcdic-lsp-darwin-amd64.tar.gz
+          # musl rather than glibc: the server has no C dependencies, so a static binary avoids
+          # "GLIBC_2.xx not found" on older distributions.
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+            asset: ebcdic-lsp-linux-amd64.tar.gz
+          # Built on a native arm64 runner so no cross-linker or Docker is needed.
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+            asset: ebcdic-lsp-linux-arm64.tar.gz
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            asset: ebcdic-lsp-windows-amd64.zip
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Install musl tools
+        if: contains(matrix.target, 'linux-musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+          key: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      # Archives, not bare binaries: download_file unpacks them and the executable bit survives.
+      # The binary sits at the archive root because lib.rs expects <version-dir>/ebcdic-lsp.
+      - name: Package (unix)
+        if: runner.os != 'Windows'
+        env:
+          TARGET: ${{ matrix.target }}
+          ASSET: ${{ matrix.asset }}
+        run: tar -czf "$ASSET" -C "target/$TARGET/release" ebcdic-lsp
+
+      - name: Package (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          TARGET: ${{ matrix.target }}
+          ASSET: ${{ matrix.asset }}
+        run: Compress-Archive -Path "target/$env:TARGET/release/ebcdic-lsp.exe" -DestinationPath $env:ASSET
+
+      # Exercise the release artifact over real stdio before shipping it. A successful
+      # `cargo build` says nothing about whether the binary completes an LSP handshake, serves
+      # code actions, or exits cleanly -- the protocol suite covers all three. Only on targets
+      # the runner can execute natively.
+      - name: Smoke test the release binary
+        if: matrix.target == 'aarch64-apple-darwin' || matrix.target == 'x86_64-unknown-linux-musl'
+        run: cargo test --release --target ${{ matrix.target }} --test protocol
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: server/${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: List assets
+        run: ls -la assets
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: assets/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

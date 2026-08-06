@@ -1,0 +1,69 @@
+This project is a port of the Visual Studio Code extension "EBCDIC Converter" to Zed.
+
+    vscode-ebcdicconverter
+    https://github.com/CoderAllan/vscode-ebcdicconverter
+    MIT License
+    Copyright (c) 2020 Allan Simonsev
+
+The 22 conversion tables in `server/src/tables.rs` (11 EBCDIC codepages x 2 directions) are
+derived from that project's `src/EbcdicToAscii.ts` and `src/AsciiToEbcdic.ts`. They are not
+transcribed by hand: `tools/gen_tables.py` parses the upstream TypeScript and emits the Rust
+source, so the derivation is reproducible and reviewable. Run it with:
+
+    python3 tools/gen_tables.py            # regenerate
+    python3 tools/gen_tables.py --check    # verify the committed tables match upstream
+
+The conversion semantics in `server/src/convert.rs` also follow upstream's `src/Convert.ts`,
+including behaviours that look accidental but are load-bearing:
+
+  * Carriage returns are dropped rather than translated when encoding to EBCDIC, because
+    translating both CR and LF corrupts line endings.
+  * Encoded output is characters in U+0000..U+00FF whose scalar values are the EBCDIC bytes,
+    matching upstream's use of `String.fromCharCode`.
+  * Characters above U+00FF encode to U+0000, matching upstream reading past its 256-entry
+    table and passing the result to `String.fromCharCode`.
+
+------------------------------------------------------------------------------------------
+Deliberate differences from upstream
+------------------------------------------------------------------------------------------
+
+1. Invocation. Upstream registers 22 commands in the command palette. Zed's extension API has
+   no equivalent: extensions are WebAssembly components that cannot read or write buffers, and
+   the manifest has no command or keymap field. The conversions are therefore exposed as LSP
+   code actions, reached with `cmd-.` / `ctrl-.`.
+
+2. Codepage 0277, byte 0x0D. Upstream maps EBCDIC CR to the empty string in this one table,
+   while all ten other codepages map it to "\r"; every cp0277 conversion silently deletes
+   carriage returns. This port maps it to "\r". The correction lives in `PATCHES` in
+   `tools/gen_tables.py`, which asserts upstream's current value before applying the fix, so
+   regeneration fails loudly if upstream ever changes it.
+
+3. Whole-file selection byte offsets. Upstream's on-disk path slices raw file bytes using
+   `selection.start.character` and `selection.end.character`, applying column offsets to
+   whole-file byte offsets and so converting the wrong bytes for any multi-line selection.
+   This port converts selections from buffer text, so that path does not exist here.
+
+4. Characters above U+00FF when decoding buffer text. Upstream appends the literal string
+   "undefined" (the result of JavaScript string concatenation with an out-of-range array read).
+   This port passes such characters through unchanged.
+
+5. A codepage filter setting. Upstream contributes no configuration. Because 22 entries in a
+   code-action menu is noisier than 22 entries in a searchable palette, `codepages` can narrow
+   the list. It defaults to all 11, matching upstream.
+
+------------------------------------------------------------------------------------------
+Additions with no upstream equivalent
+------------------------------------------------------------------------------------------
+
+`ebcdic-lsp convert` and the RDW de-framer (`server/src/cli.rs`, `server/src/rdw.rs`) are
+original to this project.
+
+They exist because the in-editor path cannot reach real mainframe data files. Zed classifies any
+file with a stray NUL byte in its first 1024 bytes as binary and refuses to open it, so such a
+file never becomes a buffer, never produces a `didOpen`, and can never receive a code action.
+Variable-length EBCDIC extracts contain NULs from both record framing and packed-decimal fields.
+
+The de-framer implements the standard IBM Record/Segment Descriptor Word rules for `RECFM=VB`
+and `RECFM=VBS` datasets and carries no vendor-specific knowledge. Upstream has no equivalent;
+the VS Code extension cannot read these files either.
+

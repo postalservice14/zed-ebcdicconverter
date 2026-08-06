@@ -1,0 +1,7 @@
+# Python runs tools/gen_tables.py, which derives server/src/tables.rs from upstream.
+# The script uses only the standard library, so any modern 3.x works; pinning keeps the
+# generated output reproducible across machines.
+python 3.14.3t
+
+# Rust is pinned in rust-toolchain.toml instead of here. rustup is what installs the
+# wasm32-wasip2 target that Zed extensions compile to, and asdf-rust does not manage targets.
