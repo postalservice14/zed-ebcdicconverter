@@ -178,6 +178,30 @@ pub fn file_path(uri: &Uri) -> Option<PathBuf> {
     }))
 }
 
+/// Build the `file:` URI an editor would send for `path`, inverting [`file_path`].
+///
+/// Test-only: the server receives URIs and never constructs them. It lives here, beside the
+/// parser it inverts, so tests exercise the real round trip rather than hand-written strings --
+/// which is what let a Windows-invalid `file://C:\dir\file` slip through.
+#[cfg(test)]
+pub fn uri_for_path(path: &std::path::Path) -> Uri {
+    let mut text = String::from("file://");
+    // Windows paths are `C:\dir\file`; URIs need forward slashes and a leading one before the
+    // drive letter, giving `file:///C:/dir/file`.
+    if !path.to_string_lossy().starts_with('/') {
+        text.push('/');
+    }
+    for byte in path.to_string_lossy().replace('\\', "/").bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' | b':' => {
+                text.push(char::from(byte))
+            }
+            other => text.push_str(&format!("%{other:02X}")),
+        }
+    }
+    text.parse().expect("constructed a valid file URI")
+}
+
 /// Decode `%XX` escapes. Returns `None` if the result is not valid UTF-8 or an escape is
 /// malformed, since a path we cannot decode is one we must not guess at.
 fn percent_decode(input: &str) -> Option<String> {
@@ -350,6 +374,30 @@ mod tests {
         assert_eq!(
             file_path(&uri("file:///C:/data/a.dat")),
             Some(PathBuf::from("C:/data/a.dat"))
+        );
+    }
+
+    #[test]
+    fn uri_for_path_round_trips_on_this_platform() {
+        // Uses a real temp path, so it exercises whatever shape this OS actually produces
+        // (drive letters and backslashes on Windows, a leading slash elsewhere).
+        let path = std::env::temp_dir().join("ebcdic round trip.dat");
+        let round_tripped = file_path(&uri_for_path(&path));
+        assert_eq!(round_tripped.as_deref(), Some(path.as_path()));
+    }
+
+    #[test]
+    fn uri_for_path_escapes_characters_that_are_invalid_in_a_uri() {
+        let uri = uri_for_path(std::path::Path::new("/tmp/a b.dat"));
+        assert!(
+            uri.as_str().contains("%20"),
+            "spaces must be escaped: {}",
+            uri.as_str()
+        );
+        assert_eq!(
+            file_path(&uri),
+            Some(PathBuf::from("/tmp/a b.dat")),
+            "escaping must survive the round trip"
         );
     }
 

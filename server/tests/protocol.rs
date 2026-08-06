@@ -5,6 +5,7 @@
 //! "works" still fails to attach in an editor.
 
 use std::io::{BufRead, BufReader, Read, Write};
+use std::path::Path;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -176,6 +177,27 @@ impl Server {
     }
 }
 
+/// Build the `file:` URI an editor would send for `path`.
+///
+/// `format!("file://{}", path.display())` is wrong on Windows: it yields `file://C:\dir\file`,
+/// which is not a valid URI. Forward slashes and a leading slash before the drive letter are
+/// both required.
+fn file_uri(path: &Path) -> String {
+    let mut text = String::from("file://");
+    if !path.to_string_lossy().starts_with('/') {
+        text.push('/');
+    }
+    for byte in path.to_string_lossy().replace('\\', "/").bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' | b':' => {
+                text.push(char::from(byte))
+            }
+            other => text.push_str(&format!("%{other:02X}")),
+        }
+    }
+    text
+}
+
 fn position(line: u32, character: u32) -> serde_json::Value {
     serde_json::json!({ "line": line, "character": character })
 }
@@ -285,7 +307,7 @@ fn decodes_a_real_ebcdic_file_from_disk() {
     std::fs::create_dir_all(&directory).expect("create temp dir");
     let path = directory.join("hello.dat");
     std::fs::write(&path, [0xC8u8, 0xC5, 0xD3, 0xD3, 0xD6]).expect("write ebcdic bytes");
-    let uri = format!("file://{}", path.display());
+    let uri = file_uri(&path);
 
     let mut server = Server::start(serde_json::json!({ "codepages": ["0037"] }));
     // What a UTF-8 decoder produces for those bytes, which is what the editor holds.

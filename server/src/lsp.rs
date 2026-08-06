@@ -495,7 +495,7 @@ mod tests {
         let path = directory.join("hello.dat");
         std::fs::write(&path, [0xC8u8, 0xC5, 0xD3, 0xD3, 0xD6]).expect("write ebcdic file");
 
-        let document = uri(&format!("file://{}", path.display()));
+        let document = document::uri_for_path(&path);
         // Mojibake stands in for what Zed actually shows for these bytes.
         let server = server_with(
             &document,
@@ -523,7 +523,7 @@ mod tests {
         let path = directory.join("hello.dat");
         std::fs::write(&path, [0xC8u8, 0xC5, 0xD3, 0xD3, 0xD6]).expect("write ebcdic file");
 
-        let document = uri(&format!("file://{}", path.display()));
+        let document = document::uri_for_path(&path);
         // Buffer holds characters whose scalars are EBCDIC bytes for "HI".
         let buffer = format!("{}{}", char::from(0xC8u8), char::from(0xC9u8));
         let server = server_with(&document, &buffer, json!({ "codepages": ["0037"] }));
