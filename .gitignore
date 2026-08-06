@@ -13,6 +13,9 @@ __pycache__/
 .idea/
 .DS_Store
 
+# Local AI coding-agent guidance; the README and NOTICE are the tracked source of truth.
+CLAUDE.md
+
 # .zed/tasks.json is intentionally tracked as a usable example; ignore the rest of .zed/.
 .zed/*
 !.zed/tasks.json
